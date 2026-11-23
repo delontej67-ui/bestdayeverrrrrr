@@ -1,0 +1,121 @@
+name: Deploy Web
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write site
+        run: |
+          mkdir -p site
+          cat > site/index.html << 'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+          <meta name="apple-mobile-web-app-capable" content="yes">
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+          <meta name="apple-mobile-web-app-title" content="SmokeTest">
+          <link rel="manifest" href="manifest.webmanifest">
+          <title>SmokeTest</title>
+          <style>
+          * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+          html, body { margin: 0; height: 100%; }
+          body {
+            font: 16px/1.4 -apple-system, system-ui, sans-serif;
+            color: #fff; background: #000; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 18px;
+            padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px);
+            background-image: linear-gradient(var(--tint), #000);
+            background-size: 100% 55%; background-repeat: no-repeat;
+          }
+          .kicker { font: 700 12px ui-monospace, monospace; letter-spacing: 4px; opacity: .55; }
+          #pad {
+            width: 210px; height: 210px; border: 0; border-radius: 42px;
+            font: 800 92px/1 -apple-system, system-ui, sans-serif;
+            color: #fff; background: var(--tint);
+            box-shadow: 0 10px 30px rgba(0,0,0,.5);
+            font-variant-numeric: tabular-nums; cursor: pointer;
+            transition: transform .06s;
+          }
+          #pad:active { transform: scale(.96); }
+          .hint { font-size: 13px; opacity: .5; }
+          input[type=range] { width: 78%; accent-color: var(--tint); }
+          pre {
+            font: 11px ui-monospace, monospace; text-align: center; margin: 0;
+            opacity: .7; background: rgba(255,255,255,.08); border-radius: 14px;
+            padding: 12px 16px; backdrop-filter: blur(10px);
+          }
+          #share {
+            border: 0; border-radius: 999px; padding: 11px 22px;
+            font: 600 14px -apple-system, system-ui, sans-serif;
+            color: #fff; background: rgba(255,255,255,.14); backdrop-filter: blur(10px);
+          }
+          </style>
+          </head>
+          <body>
+          <div class="kicker">SMOKE TEST</div>
+          <button id="pad">0</button>
+          <div class="hint">Tap to count</div>
+          <input id="hue" type="range" min="0" max="360" value="200">
+          <pre id="info"></pre>
+          <button id="share">Share report</button>
+          <script>
+          var taps = 0, pad = document.getElementById('pad'), hue = document.getElementById('hue');
+          function paint() {
+            document.body.style.setProperty('--tint', 'hsl(' + hue.value + ' 80% 55%)');
+          }
+          function info() {
+            return [
+              navigator.platform || 'unknown',
+              screen.width + 'x' + screen.height + ' @' + (window.devicePixelRatio || 1) + 'x',
+              (navigator.userAgent.match(/OS [\d_]+/) || ['OS ?'])[0].replace(/_/g, '.'),
+              Intl.DateTimeFormat().resolvedOptions().timeZone,
+              'taps: ' + taps
+            ].join('\n');
+          }
+          function render() {
+            pad.textContent = taps;
+            document.getElementById('info').textContent = info();
+          }
+          pad.onclick = function () { taps++; render(); };
+          hue.oninput = paint;
+          document.getElementById('share').onclick = function () {
+            if (navigator.share) navigator.share({ title: 'SmokeTest', text: info() });
+            else navigator.clipboard.writeText(info());
+          };
+          paint(); render();
+          </script>
+          </body>
+          </html>
+          HTML
+          cat > site/manifest.webmanifest << 'JSON'
+          {
+            "name": "SmokeTest",
+            "short_name": "SmokeTest",
+            "display": "standalone",
+            "background_color": "#000000",
+            "theme_color": "#000000",
+            "start_url": "."
+          }
+          JSON
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
